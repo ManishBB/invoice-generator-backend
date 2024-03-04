@@ -13,65 +13,75 @@ const generateAccessToken = async (userId) => {
         throw new ApiError(500, "Something went wrong");
     }
 };
+
 const registerUser = async (req, res) => {
-    const { name, email, password } = req.body;
+    try {
+        const { name, email, password } = req.body;
 
-    if ([name, email, password].some((field) => field.trim() === "")) {
-        throw new ApiError(400, "All fields are required");
+        if (!name || !email || !password) {
+            return res
+                .status(400)
+                .json({ error: "Name, email, and password are required." });
+        }
+
+        const existingUser = await User.findOne({ email: email });
+
+        if (existingUser) {
+            return res.status(409).json({ error: "User already exists." });
+        }
+
+        // Assuming createUser is a function that handles user creation and hashing of the password
+        const newUser = await createUser({ name, email, password });
+
+        return res
+            .status(201)
+            .json({ message: "User created successfully.", user: newUser });
+    } catch (error) {
+        return res.status(500).json({ error: "Internal Server Error." });
     }
-
-    const existedUser = await User.findOne({ email: email });
-
-    if (existedUser) throw new ApiError(409, "User already exists");
-
-    const newUser = await User.create({
-        name,
-        email,
-        password,
-    });
-
-    const createdUser = await User.findById(newUser._id).select("-password");
-
-    if (!createdUser)
-        throw new ApiError(
-            500,
-            "Something went wrong while creating a new user"
-        );
-
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(200, createdUser, "User registered successfully")
-        );
 };
 
 const loginUser = async (req, res) => {
-    const { email, password } = req.body;
+    try {
+        const { email, password } = req.body;
 
-    if (!email || !password)
-        throw new ApiError(403, "Invalid email or password");
+        if (!email || !password) {
+            return res
+                .status(400)
+                .json({ error: "Email and password are required." });
+        }
 
-    const user = await User.findOne({ email: email });
+        const user = await User.findOne({ email: email });
 
-    if (!user) throw new ApiError(404, "User not found");
+        if (!user) {
+            return res.status(404).json({ error: "User not found." });
+        }
 
-    const isPasswordCorrect = await user.isPasswordCorrect(password);
+        const isPasswordCorrect = await user.isPasswordCorrect(password);
 
-    if (!isPasswordCorrect) throw new ApiError(401, "Invalid credentials");
+        if (!isPasswordCorrect) {
+            return res.status(401).json({ error: "Invalid credentials." });
+        }
 
-    const { accessToken } = await generateAccessToken(user._id);
+        const { accessToken } = await generateAccessToken(user._id);
 
-    const loggedInUser = await User.findOne(user._id).select("-password");
+        const loggedInUser = await User.findOne(user._id).select("-password");
 
-    const options = {
-        httpOnly: true,
-        secure: true,
-    };
+        const options = {
+            httpOnly: true,
+            secure: true,
+        };
 
-    return res.status(200).cookie("accessToken", accessToken, options).json({
-        loggedInUser,
-        accessToken: accessToken,
-    });
+        return res
+            .status(200)
+            .cookie("accessToken", accessToken, options)
+            .json({
+                loggedInUser,
+                accessToken: accessToken,
+            });
+    } catch (error) {
+        return res.status(500).json({ error: "Internal Server Error." });
+    }
 };
 
 export { registerUser, loginUser };
