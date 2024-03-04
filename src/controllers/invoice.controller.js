@@ -14,9 +14,34 @@ const __dirname = dirname(__filename);
 
 const createInvoice = async (req, res) => {
     try {
-        const { pdfData } = req.body;
+        if (!req.body.pdfData) {
+            return res.status(400).json({ error: "No invoice data provided." });
+        }
 
+        const { pdfData } = req.body;
         const { products, total, gst, totalWithGst } = pdfData;
+
+        // Validate the necessary fields in pdfData
+        if (!products || !Array.isArray(products) || products.length === 0) {
+            return res
+                .status(400)
+                .json({ error: "Invoice must include at least one product." });
+        }
+        if (typeof total !== "number" || total <= 0) {
+            return res
+                .status(400)
+                .json({ error: "Total must be a positive number." });
+        }
+        if (typeof gst !== "number" || gst < 0) {
+            return res
+                .status(400)
+                .json({ error: "GST must be a non-negative number." });
+        }
+        if (typeof totalWithGst !== "number" || totalWithGst <= 0) {
+            return res
+                .status(400)
+                .json({ error: "Total with GST must be a positive number." });
+        }
 
         const newInvoice = new Invoice({
             products: products,
@@ -97,6 +122,7 @@ const createInvoice = async (req, res) => {
         doc.end();
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ error: "Internal Server Error." });
     }
 };
 
