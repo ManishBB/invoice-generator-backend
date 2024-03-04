@@ -1,7 +1,18 @@
-import { User } from "../models/User.model.js";
+import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
+const generateAccessToken = async (userId) => {
+    try {
+        const user = await User.findById(userId);
+
+        const accessToken = await user.generateAccessToken();
+
+        return { accessToken };
+    } catch (error) {
+        throw new ApiError(500, "Something went wrong");
+    }
+};
 const registerUser = async (req, res) => {
     const { name, email, password } = req.body;
 
@@ -48,10 +59,18 @@ const loginUser = async (req, res) => {
 
     if (!isPasswordCorrect) throw new ApiError(401, "Invalid credentials");
 
+    const { accessToken } = await generateAccessToken(user._id);
+
     const loggedInUser = await User.findOne(user._id).select("-password");
 
-    return res.status(200).json({
+    const options = {
+        httpOnly: true,
+        secure: true,
+    };
+
+    return res.status(200).cookie("accessToken", accessToken, options).json({
         loggedInUser,
+        accessToken: accessToken,
     });
 };
 
